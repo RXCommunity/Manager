@@ -182,6 +182,8 @@ services=(
     "php7.2-fpm"
     "docker"
     "cachet-monitor"
+    "telegraf"
+    "grafana-server"
 )
 containers=(
     "forum"
@@ -195,6 +197,8 @@ containers=(
     "ptero-redis"
     "cachet-docker_cachet_1"
     "cachet-docker_postgres_1"
+    "influxdb"
+    "grafana-storage"
 )
 
 panelversion=$(getlatest "Pterodactyl/panel")
