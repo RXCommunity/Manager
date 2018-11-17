@@ -200,7 +200,7 @@ containers=(
 panelversion=$(getlatest "Pterodactyl/panel")
 themeversion=$(getlatest "RXCommunity/RedXen-Panel")
 dockercont=$(docker ps)
-servicelist=$(systemctl status | grep service)
+servicelist=$(systemctl list-units --type=service --state=active | grep -oe ".*\.service")
 dockerstatus=$(systemctl status | grep -c docker)
 
 ## Colors
