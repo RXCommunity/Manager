@@ -1,0 +1,221 @@
+#!/bin/bash
+
+## Functions
+
+function maitenance {
+    echo -e "${BLUE}Removing stopped containers...${NC}"
+    docker container prune -f
+    echo -e "${BLUE}Pruning unused images...${NC}"
+    docker image prune -f
+    echo -e "${BLUE}Pruning unused volumes...${NC}"
+    docker volume prune -f
+}
+
+function getlatest () {
+    curl -s https://api.github.com/repos/${1}/releases/latest | grep -oP '"tag_name": "\K(.*)(?=")'
+}
+
+## Pre-/Post- fix
+
+function pa () {
+    php artisan ${1}
+}
+
+## Pre-/Post- execute
+
+function start {
+    echo -e "\n${BLUE}Starting services: ${NC}"
+    svc-handler "start"
+    echo -e "\n${BLUE}Starting containers: ${NC}"
+    dc-handler "start"
+}
+
+function stop {
+    echo -e "\n${BLUE}Stopping containers: ${NC}"
+    dc-handler "stop"
+    echo -e "\n${BLUE}Stopping services: ${NC}"
+    svc-handler "stop"
+}
+
+function status {
+    echo -e "\n${BLUE}Services: ${NC}"
+    svc-handler "status"
+    echo -e "\n${BLUE}Containers: ${NC}"
+    dc-handler "status"
+}
+
+## Handlers
+
+## Service handler
+function svc-handler () {
+    for i in "${services[@]}"; do
+        case "$1" in
+            start)
+                if (( $(echo "${servicelist}" | grep -c "$i") > 0 )); then
+                    echo -e "${BLUE}Service $i was already running! ${NC}"
+                else
+                    if (systemctl start "$i" > /dev/null 2>&1); then
+                        echo -e "${GREEN}Started service $i succesfully! ${NC}"
+                    else
+                        echo -e "${RED}Failed to start service $i! ${NC}"
+                    fi
+                fi
+            ;;
+            stop)
+                if (( $(echo "${servicelist}" | grep -c "$i") > 0 )); then
+                    if (systemctl stop "$i" > /dev/null 2>&1); then
+                        echo -e "${GREEN}Stopped service $i succesfully! ${NC}"
+                    else
+                        echo -e "${RED}Failed to stop service $i! ${NC}"
+                    fi
+                else
+                    echo -e "${BLUE}Service $i is already stopped! ${NC}"
+                fi
+            ;;
+            status)
+                if (( $(echo "${servicelist}" | grep -c "$i") > 0 )); then
+                    echo -e "${GREEN}Service $i is up and running! ${NC}"
+                else
+                    echo -e "${RED}Service $i is stopped! ${NC}"
+                fi
+            ;;
+        esac
+    done
+}
+
+## Docker handler
+function dc-handler () {
+    for i in "${containers[@]}"; do
+        if (( "${dockerstatus}" > 0 )); then
+            case "$1" in
+                start)
+                    if (( $(echo "${dockercont}" | grep -c "$i") > 0 )); then
+                        echo -e "${BLUE}Container $i was already up and running! ${NC}"
+                    else
+                        if (docker start "$i" > /dev/null 2>&1); then
+                            echo -e "${GREEN}Started container $i succesfully! ${NC}"
+                        else
+                            echo -e "${RED}Failed to start container $i! ${NC}"
+                        fi
+                    fi
+                ;;
+                stop)
+                    if (( $(echo "${dockercont}" | grep -c "$i") > 0 )); then
+                        if (docker stop --time=20 "$i" > /dev/null 2>&1); then
+                            echo -e "${GREEN}Stopped container $i succesfully! ${NC}"
+                        else
+                            echo -e "${RED}Failed to stop container $i! ${NC}"
+                        fi
+                    else
+                        echo -e "${BLUE}Container $i was already stopped! ${NC}"
+                    fi
+                ;;
+                status)
+                    if (( $(echo "${dockercont}" | grep -c "$i") > 0 )); then
+                        echo -e "${GREEN}Container $i is up and running! ${NC}"
+                    else
+                        echo -e "${RED}Container $i is stopped! ${NC}"
+                    fi
+                ;;
+            esac
+            elif (systemctl -q is-active docker); then
+            echo -e "${RED}An error has occured, we are sorry!"
+        else
+            echo -e "${RED}Docker is stopped, cannot perform check!"
+        fi
+    done
+}
+
+## Streamlined functions
+
+function update () {
+    case "$1" in
+        panel)
+            cd /var/www/pterodactyl || exit
+            pa "down"
+            curl -L https://github.com/pterodactyl/panel/releases/download/"${panelversion}"/panel.tar.gz | tar --strip-components=1 -xzv
+            curl -L https://github.com/RXCommunity/RedXen-Panel/archive/"${themeversion}".tar.gz | tar --strip-components=1 -xzv
+            chown -R www-data:www-data ./*
+            chmod -R 755 storage/* bootstrap/cache
+            composer install --no-dev --optimize-autoloader
+            pa "view:clear"
+            pa "cache:clear"
+            pa "config:cache"
+            pa "migrate --force"
+            pa "db:seed --force"
+            pa "p:migration:clean-orphaned-keys -n"
+            pa "up"
+        ;;
+        bot)
+            cd /root/yagpdb || exit
+            git pull https://github.com/jonas747/yagpdb master
+            cd ./yagpdb_docker || exit
+            docker-compose build --force-rm --no-cache --pull
+            docker-compose up -d
+        ;;
+        cloud)
+            docker pull nextcloud
+            docker stop nextcloud
+            docker rm nextcloud
+            docker run -d --name nextcloud -p 127.0.0.1:8080:80 --link nx-database -v /var/nx/nextcloud-config:/var/www/html -v /var/nx/cloud-data:/var/www/html/data nextcloud
+        ;;
+        dev)
+            cd /var/www/rxdev || exit
+            git pull https://github.com/RXCommunity/Homepage dev
+        ;;
+        home)
+            cd /var/www/rxhome || exit
+            git pull https://github.com/RXCommunity/Homepage master
+        ;;
+        forum)
+            /var/discourse/launcher rebuild forum
+        ;;
+    esac
+}
+
+## Definitions
+
+services=(
+    "pteroq"
+    "nginx"
+    "wings"
+    "php7.2-fpm"
+    "docker"
+    "cachet-monitor"
+)
+containers=(
+    "forum"
+    "sourcebans"
+    "nx-database"
+    "nextcloud"
+    "yagpdb_docker_app_1"
+    "yagpdb_docker_db_1"
+    "yagpdb_docker_redis_1"
+    "pterodactyl-db"
+    "ptero-redis"
+    "cachet-docker_cachet_1"
+    "cachet-docker_postgres_1"
+)
+
+panelversion=$(getlatest "Pterodactyl/panel")
+themeversion=$(getlatest "RXCommunity/RedXen-Panel")
+dockercont=$(docker ps)
+servicelist=$(systemctl status | grep service)
+dockerstatus=$(systemctl status | grep -c docker)
+
+## Colors
+NC='\033[0m'
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+
+## Main run
+case "$1" in
+    "start") start;;
+    "stop") stop;;
+    "restart") stop; start;;
+    "status") status;;
+    "update") update "$2";;
+    "maitenance") maitenance;;
+    *) echo -e "${RED}That command does not exist!${NC}";;
+esac
