@@ -181,8 +181,9 @@ function update () {
 
 function selfupdate {
     cd ~/bin || exit
-    echo -e "${INFO}Pulling latest version!${NC}"
-    git pull https://github.com/RXCommunity/Manager master || echo -e "${ERROR}Could not pull latest version, did you clone the repository?${NC}"
+    echo -e "${INFO}Self-updating:${NC}"
+    git pull https://github.com/RXCommunity/Manager master || \
+    echo -e "${ERROR}Could not pull latest version, did you clone the repository?${NC}"
 }
 
 ## Definitions
@@ -227,7 +228,6 @@ DONE='\033[32m'
 INFO='\033[34m'
 
 ## Main run
-selfupdate
 case "$1" in
     "start") start;;
     "stop") stop;;
@@ -235,5 +235,6 @@ case "$1" in
     "status") status;;
     "update") update "$2";;
     "maitenance") maitenance;;
+    "selfupdate") selfupdate;;
     *) echo -e "${ERROR}That command does not exist!${NC}";;
 esac
