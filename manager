@@ -190,7 +190,7 @@ function update () {
         ;;
         *)
             output "err" "That component does not exist! Available components are:"
-        output "info" "${components[*]}"
+            output "info" "${components[*]}"
         ;;
     esac
 }
