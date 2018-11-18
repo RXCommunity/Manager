@@ -3,13 +3,13 @@
 ## Functions
 
 function maitenance {
-    output "info" "Removing stopped containers...${NC}"
+    output "info" "Removing stopped containers..."
     dp "container"
-    output "info" "Pruning unused images...${NC}"
+    output "info" "Pruning unused images..."
     dp "image"
-    output "info" "Pruning unused volumes...${NC}"
+    output "info" "Pruning unused volumes..."
     dp "volume"
-    output "info" "Clearing logs...${NC}"
+    output "info" "Clearing logs..."
     rm -v /var/log/nginx/*.*
     nginx -s reload
 }
@@ -197,7 +197,7 @@ function update () {
 
 function selfupdate {
     cd ~/bin || exit
-    output "info" "Self-updating:${NC}"
+    output "info" "Self-updating:"
     git pull https://github.com/RXCommunity/Manager master || \
     output "err" "Could not pull latest version, did you clone the repository?"
 }
