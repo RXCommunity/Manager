@@ -3,12 +3,15 @@
 ## Functions
 
 function maitenance {
-    echo -e "${BLUE}Removing stopped containers...${NC}"
+    echo -e "${INFO}Removing stopped containers...${NC}"
     docker container prune -f
-    echo -e "${BLUE}Pruning unused images...${NC}"
+    echo -e "${INFO}Pruning unused images...${NC}"
     docker image prune -f
-    echo -e "${BLUE}Pruning unused volumes...${NC}"
+    echo -e "${INFO}Pruning unused volumes...${NC}"
     docker volume prune -f
+    echo -e "${INFO}Clearing logs...${NC}"
+    rm -v /var/log/nginx/*.*
+    nginx -s reload
 }
 
 function getlatest () {
@@ -24,23 +27,23 @@ function pa () {
 ## Pre-/Post- execute
 
 function start {
-    echo -e "\n${BLUE}Starting services: ${NC}"
+    echo -e "${INFO}Starting services: ${NC}"
     svc-handler "start"
-    echo -e "\n${BLUE}Starting containers: ${NC}"
+    echo -e "${INFO}Starting containers: ${NC}"
     dc-handler "start"
 }
 
 function stop {
-    echo -e "\n${BLUE}Stopping containers: ${NC}"
+    echo -e "${WARN}Stopping containers: ${NC}"
     dc-handler "stop"
-    echo -e "\n${BLUE}Stopping services: ${NC}"
+    echo -e "${WARN}Stopping services: ${NC}"
     svc-handler "stop"
 }
 
 function status {
-    echo -e "\n${BLUE}Services: ${NC}"
+    echo -e "${INFO}Services: ${NC}"
     svc-handler "status"
-    echo -e "\n${BLUE}Containers: ${NC}"
+    echo -e "${INFO}Containers: ${NC}"
     dc-handler "status"
 }
 
@@ -52,31 +55,31 @@ function svc-handler () {
         case "$1" in
             start)
                 if (( $(echo "${servicelist}" | grep -c "$i") > 0 )); then
-                    echo -e "${BLUE}Service $i was already running! ${NC}"
+                    echo -e "${WARN}Service $i was already running! ${NC}"
                 else
                     if (systemctl start "$i" > /dev/null 2>&1); then
-                        echo -e "${GREEN}Started service $i succesfully! ${NC}"
+                        echo -e "${DONE}Started service $i succesfully! ${NC}"
                     else
-                        echo -e "${RED}Failed to start service $i! ${NC}"
+                        echo -e "${ERROR}Failed to start service $i! ${NC}"
                     fi
                 fi
             ;;
             stop)
                 if (( $(echo "${servicelist}" | grep -c "$i") > 0 )); then
                     if (systemctl stop "$i" > /dev/null 2>&1); then
-                        echo -e "${GREEN}Stopped service $i succesfully! ${NC}"
+                        echo -e "${DONE}Stopped service $i succesfully! ${NC}"
                     else
-                        echo -e "${RED}Failed to stop service $i! ${NC}"
+                        echo -e "${ERROR}Failed to stop service $i! ${NC}"
                     fi
                 else
-                    echo -e "${BLUE}Service $i is already stopped! ${NC}"
+                    echo -e "${WARN}Service $i is already stopped! ${NC}"
                 fi
             ;;
             status)
                 if (( $(echo "${servicelist}" | grep -c "$i") > 0 )); then
-                    echo -e "${GREEN}Service $i is up and running! ${NC}"
+                    echo -e "${WARN}Service $i is up and running! ${NC}"
                 else
-                    echo -e "${RED}Service $i is stopped! ${NC}"
+                    echo -e "${ERROR}Service $i is stopped! ${NC}"
                 fi
             ;;
         esac
@@ -90,38 +93,38 @@ function dc-handler () {
             case "$1" in
                 start)
                     if (( $(echo "${dockercont}" | grep -c "$i") > 0 )); then
-                        echo -e "${BLUE}Container $i was already up and running! ${NC}"
+                        echo -e "${WARN}Container $i was already up and running! ${NC}"
                     else
                         if (docker start "$i" > /dev/null 2>&1); then
-                            echo -e "${GREEN}Started container $i succesfully! ${NC}"
+                            echo -e "${DONE}Started container $i succesfully! ${NC}"
                         else
-                            echo -e "${RED}Failed to start container $i! ${NC}"
+                            echo -e "${ERROR}Failed to start container $i! ${NC}"
                         fi
                     fi
                 ;;
                 stop)
                     if (( $(echo "${dockercont}" | grep -c "$i") > 0 )); then
                         if (docker stop --time=20 "$i" > /dev/null 2>&1); then
-                            echo -e "${GREEN}Stopped container $i succesfully! ${NC}"
+                            echo -e "${DONE}Stopped container $i succesfully! ${NC}"
                         else
-                            echo -e "${RED}Failed to stop container $i! ${NC}"
+                            echo -e "${ERROR}Failed to stop container $i! ${NC}"
                         fi
                     else
-                        echo -e "${BLUE}Container $i was already stopped! ${NC}"
+                        echo -e "${WARN}Container $i was already stopped! ${NC}"
                     fi
                 ;;
                 status)
                     if (( $(echo "${dockercont}" | grep -c "$i") > 0 )); then
-                        echo -e "${GREEN}Container $i is up and running! ${NC}"
+                        echo -e "${WARN}Container $i is up and running! ${NC}"
                     else
-                        echo -e "${RED}Container $i is stopped! ${NC}"
+                        echo -e "${ERROR}Container $i is stopped! ${NC}"
                     fi
                 ;;
             esac
             elif (systemctl -q is-active docker); then
-            echo -e "${RED}An error has occured, we are sorry!"
+            echo -e "${ERROR}An error has occured, we are sorry!"
         else
-            echo -e "${RED}Docker is stopped, cannot perform check!"
+            echo -e "${ERROR}Docker is stopped, cannot perform check!"
         fi
     done
 }
@@ -170,7 +173,16 @@ function update () {
         forum)
             /var/discourse/launcher rebuild forum
         ;;
+        *)
+            echo -e "${ERROR}That component does not exist!${NC}"
+        ;;
     esac
+}
+
+function selfupdate {
+    cd ~/bin || exit
+    echo -e "${INFO}Pulling latest version!${NC}"
+    git pull https://github.com/RXCommunity/Manager master || echo -e "${ERROR}Could not pull latest version, did you clone the repository?${NC}"
 }
 
 ## Definitions
@@ -209,11 +221,13 @@ dockerstatus=$(systemctl status | grep -c docker)
 
 ## Colors
 NC='\033[0m'
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-BLUE='\033[0;34m'
+ERROR='\033[31m'
+WARN='\033[33m'
+DONE='\033[32m'
+INFO='\033[34m'
 
 ## Main run
+selfupdate
 case "$1" in
     "start") start;;
     "stop") stop;;
@@ -221,5 +235,5 @@ case "$1" in
     "status") status;;
     "update") update "$2";;
     "maitenance") maitenance;;
-    *) echo -e "${RED}That command does not exist!${NC}";;
+    *) echo -e "${ERROR}That command does not exist!${NC}";;
 esac
