@@ -3,47 +3,62 @@
 ## Functions
 
 function maitenance {
-    echo -e "${INFO}Removing stopped containers...${NC}"
-    docker container prune -f
-    echo -e "${INFO}Pruning unused images...${NC}"
-    docker image prune -f
-    echo -e "${INFO}Pruning unused volumes...${NC}"
-    docker volume prune -f
-    echo -e "${INFO}Clearing logs...${NC}"
+    output "info" "Removing stopped containers...${NC}"
+    dp "container"
+    output "info" "Pruning unused images...${NC}"
+    dp "image"
+    output "info" "Pruning unused volumes...${NC}"
+    dp "volume"
+    output "info" "Clearing logs...${NC}"
     rm -v /var/log/nginx/*.*
     nginx -s reload
 }
 
 function getlatest () {
-    curl -s https://api.github.com/repos/${1}/releases/latest | grep -oP '"tag_name": "\K(.*)(?=")'
+    curl -s https://api.github.com/repos/"${1}"/releases/latest | grep -oP '"tag_name": "\K(.*)(?=")'
 }
 
 ## Pre-/Suf- fix
 
 function pa () {
-    php artisan ${1}
+    php artisan "${1}"
+}
+
+function dp () {
+    docker "${1}" prune -f
+}
+
+## Output types
+
+function output () {
+    case "$1" in
+        "info") echo -e "${INFO}$2${NC}";;
+        "done") echo -e "${DONE}$2${NC}";;
+        "warn") echo -e "${WARN}$2${NC}";;
+        "err") echo -e "${ERROR}$2${NC}";;
+    esac
 }
 
 ## Pre-/Post- execute
 
 function start {
-    echo -e "${INFO}Starting services: ${NC}"
+    output "info" "Starting services:"
     svc-handler "start"
-    echo -e "${INFO}Starting containers: ${NC}"
+    output "info" "Starting containers:"
     dc-handler "start"
 }
 
 function stop {
-    echo -e "${WARN}Stopping containers: ${NC}"
+    output "warn" "Stopping containers:"
     dc-handler "stop"
-    echo -e "${WARN}Stopping services: ${NC}"
+    output "warn" "Stopping services:"
     svc-handler "stop"
 }
 
 function status {
-    echo -e "${INFO}Services: ${NC}"
+    output "info" "Services:"
     svc-handler "status"
-    echo -e "${INFO}Containers: ${NC}"
+    output "info" "Containers:"
     dc-handler "status"
 }
 
@@ -53,33 +68,33 @@ function status {
 function svc-handler () {
     for i in "${services[@]}"; do
         case "$1" in
-            start)
+            "start")
                 if (( $(echo "${servicelist}" | grep -c "$i") > 0 )); then
-                    echo -e "${WARN}Service $i was already running! ${NC}"
+                    output "warn" "Service $i was already running!"
                 else
                     if (systemctl start "$i" > /dev/null 2>&1); then
-                        echo -e "${DONE}Started service $i succesfully! ${NC}"
+                        output "done" "Started service $i succesfully!"
                     else
-                        echo -e "${ERROR}Failed to start service $i! ${NC}"
+                        output "err" "Failed to start service $i!"
                     fi
                 fi
             ;;
-            stop)
+            "stop")
                 if (( $(echo "${servicelist}" | grep -c "$i") > 0 )); then
                     if (systemctl stop "$i" > /dev/null 2>&1); then
-                        echo -e "${DONE}Stopped service $i succesfully! ${NC}"
+                        output "done" "Stopped service $i succesfully!"
                     else
-                        echo -e "${ERROR}Failed to stop service $i! ${NC}"
+                        output "err" "Failed to stop service $i!"
                     fi
                 else
-                    echo -e "${WARN}Service $i is already stopped! ${NC}"
+                    output "warn" "Service $i is already stopped!"
                 fi
             ;;
-            status)
+            "status")
                 if (( $(echo "${servicelist}" | grep -c "$i") > 0 )); then
-                    echo -e "${WARN}Service $i is up and running! ${NC}"
+                    output "warn" "Service $i is up and running!"
                 else
-                    echo -e "${ERROR}Service $i is stopped! ${NC}"
+                    output "err" "Service $i is stopped!"
                 fi
             ;;
         esac
@@ -91,40 +106,40 @@ function dc-handler () {
     for i in "${containers[@]}"; do
         if (( "${dockerstatus}" > 0 )); then
             case "$1" in
-                start)
+                "start")
                     if (( $(echo "${dockercont}" | grep -c "$i") > 0 )); then
-                        echo -e "${WARN}Container $i was already up and running! ${NC}"
+                        output "warn" "Container $i was already up and running!"
                     else
                         if (docker start "$i" > /dev/null 2>&1); then
-                            echo -e "${DONE}Started container $i succesfully! ${NC}"
+                            output "done" "Started container $i succesfully!"
                         else
-                            echo -e "${ERROR}Failed to start container $i! ${NC}"
+                            output "err" "Failed to start container $i!"
                         fi
                     fi
                 ;;
-                stop)
+                "stop")
                     if (( $(echo "${dockercont}" | grep -c "$i") > 0 )); then
                         if (docker stop --time=20 "$i" > /dev/null 2>&1); then
-                            echo -e "${DONE}Stopped container $i succesfully! ${NC}"
+                            output "done" "Stopped container $i succesfully!"
                         else
-                            echo -e "${ERROR}Failed to stop container $i! ${NC}"
+                            output "err" "Failed to stop container $i!"
                         fi
                     else
-                        echo -e "${WARN}Container $i was already stopped! ${NC}"
+                        output "warn" "Container $i was already stopped!"
                     fi
                 ;;
-                status)
+                "status")
                     if (( $(echo "${dockercont}" | grep -c "$i") > 0 )); then
-                        echo -e "${WARN}Container $i is up and running! ${NC}"
+                        output "warn" "Container $i is up and running!"
                     else
-                        echo -e "${ERROR}Container $i is stopped! ${NC}"
+                        output "err" "Container $i is stopped!"
                     fi
                 ;;
             esac
             elif (systemctl -q is-active docker); then
-            echo -e "${ERROR}An error has occured, we are sorry!"
+            output "err" "An error has occured, we are sorry!"
         else
-            echo -e "${ERROR}Docker is stopped, cannot perform check!"
+            output "err" "Docker is stopped, cannot perform check!"
         fi
     done
 }
@@ -133,7 +148,7 @@ function dc-handler () {
 
 function update () {
     case "$1" in
-        panel)
+        "panel")
             cd /var/www/pterodactyl || exit
             pa "down"
             curl -L https://github.com/pterodactyl/panel/releases/download/"${panelversion}"/panel.tar.gz | tar --strip-components=1 -xzv
@@ -149,41 +164,42 @@ function update () {
             pa "p:migration:clean-orphaned-keys -n"
             pa "up"
         ;;
-        bot)
+        "bot")
             cd /root/yagpdb || exit
             git pull https://github.com/jonas747/yagpdb master
             cd ./yagpdb_docker || exit
             docker-compose build --force-rm --no-cache --pull
             docker-compose up -d
         ;;
-        cloud)
+        "cloud")
             docker pull nextcloud
             docker stop nextcloud
             docker rm nextcloud
             docker run -d --name nextcloud -p 127.0.0.1:8080:80 --link nx-database -v /var/nx/nextcloud-config:/var/www/html -v /var/nx/cloud-data:/var/www/html/data nextcloud
         ;;
-        dev)
+        "dev")
             cd /var/www/rxdev || exit
             git pull https://github.com/RXCommunity/Homepage dev
         ;;
-        home)
+        "home")
             cd /var/www/rxhome || exit
             git pull https://github.com/RXCommunity/Homepage master
         ;;
-        forum)
+        "forum")
             /var/discourse/launcher rebuild forum
         ;;
         *)
-            echo -e "${ERROR}That component does not exist!${NC}"
+            output "err" "That component does not exist! Available components are:"
+        output "info" "${components[*]}"
         ;;
     esac
 }
 
 function selfupdate {
     cd ~/bin || exit
-    echo -e "${INFO}Self-updating:${NC}"
+    output "info" "Self-updating:${NC}"
     git pull https://github.com/RXCommunity/Manager master || \
-    echo -e "${ERROR}Could not pull latest version, did you clone the repository?${NC}"
+    output "err" "Could not pull latest version, did you clone the repository?"
 }
 
 ## Definitions
@@ -213,6 +229,23 @@ containers=(
     "influxdb"
     "grafana-storage"
 )
+functions=(
+    "start"
+    "stop"
+    "restart"
+    "status"
+    "update"
+    "maitenance"
+    "selfupdate"
+)
+components=(
+    "panel"
+    "bot"
+    "cloud"
+    "dev"
+    "home"
+    "forum"
+)
 
 panelversion=$(getlatest "Pterodactyl/panel")
 themeversion=$(getlatest "RXCommunity/RedXen-Panel")
@@ -236,5 +269,8 @@ case "$1" in
     "update") update "$2";;
     "maitenance") maitenance;;
     "selfupdate") selfupdate;;
-    *) echo -e "${ERROR}That command does not exist!${NC}";;
+    *)
+        output "err" "That command does not exist! Available functions are:"
+        output "info" "${functions[*]}"
+    ;;
 esac
