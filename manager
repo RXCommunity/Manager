@@ -12,6 +12,7 @@ function maitenance {
     output "info" "Clearing logs..."
     rm -v /var/log/nginx/*.*
     nginx -s reload
+    output "info" "Restarting Telegraf to update log files..."
     systemctl restart telegraf 
 }
 
