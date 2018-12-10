@@ -12,6 +12,7 @@ function maitenance {
     output "info" "Clearing logs..."
     rm -v /var/log/nginx/*.*
     nginx -s reload
+    systemctl restart telegraf 
 }
 
 function getlatest () {
@@ -151,8 +152,8 @@ function update () {
         "panel")
             cd /var/www/pterodactyl || exit
             pa "down"
-            curl -L https://github.com/pterodactyl/panel/releases/download/"${panelversion}"/panel.tar.gz | tar --strip-components=1 -xzv
-            curl -L https://github.com/RXCommunity/RedXen-Panel/archive/"${themeversion}".tar.gz | tar --strip-components=1 -xzv
+            curl -L https://github.com/pterodactyl/panel/releases/download/"$(getlatest "Pterodactyl/panel")"/panel.tar.gz | tar --strip-components=1 -xzv
+            curl -L https://github.com/RXCommunity/RedXen-Panel/archive/"$(getlatest "RXCommunity/RedXen-Panel")".tar.gz | tar --strip-components=1 -xzv
             chown -R www-data:www-data ./*
             chmod -R 755 storage/* bootstrap/cache
             composer install --no-dev --optimize-autoloader
@@ -247,8 +248,6 @@ components=(
     "forum"
 )
 
-panelversion=$(getlatest "Pterodactyl/panel")
-themeversion=$(getlatest "RXCommunity/RedXen-Panel")
 dockercont=$(docker ps)
 servicelist=$(systemctl list-units --type=service --state=active | grep -oe ".*\.service")
 dockerstatus=$(systemctl status | grep -c docker)
