@@ -13,7 +13,7 @@ function maitenance {
     rm -v /var/log/nginx/*.*
     nginx -s reload
     output "info" "Restarting Telegraf to update log files..."
-    systemctl restart telegraf 
+    systemctl restart telegraf
 }
 
 function getlatest () {
@@ -21,10 +21,6 @@ function getlatest () {
 }
 
 ## Pre-/Suf- fix
-
-function pa () {
-    php artisan "${1}"
-}
 
 function dp () {
     docker "${1}" prune -f
@@ -151,20 +147,15 @@ function dc-handler () {
 function update () {
     case "$1" in
         "panel")
-            cd /var/www/pterodactyl || exit
-            pa "down"
+            (cd "/var/www/pterodactyl" && php artisan down) || exit
             curl -L https://github.com/pterodactyl/panel/releases/download/"$(getlatest "Pterodactyl/panel")"/panel.tar.gz | tar --strip-components=1 -xzv
             curl -L https://github.com/RXCommunity/RedXen-Panel/archive/"$(getlatest "RXCommunity/RedXen-Panel")".tar.gz | tar --strip-components=1 -xzv
             chown -R www-data:www-data ./*
             chmod -R 755 storage/* bootstrap/cache
             composer install --no-dev --optimize-autoloader
-            pa "view:clear"
-            pa "cache:clear"
-            pa "config:cache"
-            pa "migrate --force"
-            pa "db:seed --force"
-            pa "p:migration:clean-orphaned-keys -n"
-            pa "up"
+            for f in "${artisanfunc[@]}"; do
+                php artisan $f
+            done
         ;;
         "bot")
             cd /root/yagpdb || exit
@@ -247,6 +238,15 @@ components=(
     "dev"
     "home"
     "forum"
+)
+artisanfunc=(
+    "view:clear"
+    "cache:clear"
+    "config:cache"
+    "migrate --force"
+    "db:seed --force"
+    "p:migration:clean-orphaned-keys -n"
+    "up"
 )
 
 dockercont=$(docker ps)
