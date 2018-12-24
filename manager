@@ -191,8 +191,13 @@ function update () {
 function selfupdate {
     cd ~/bin || exit
     output "info" "Self-updating:"
-    git clean || git reset --hard origin/master
-    git pull https://github.com/RXCommunity/Manager master
+    [ -n $(git diff --name-only origin/master | grep manager) ] && {
+        git clean -fd && \
+        git reset --hard HEAD && \
+        git pull https://github.com/RXCommunity/manager master
+    } || {
+        output "info" "Already latest version!"
+    }
 }
 
 ## Definitions
