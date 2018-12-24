@@ -193,7 +193,6 @@ function selfupdate {
     output "info" "Self-updating:"
     git clean || git reset --hard origin/master
     git pull https://github.com/RXCommunity/Manager master
-    chmod +x manager
 }
 
 ## Definitions
