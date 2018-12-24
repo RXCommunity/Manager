@@ -192,7 +192,7 @@ function selfupdate {
     cd ~/bin || exit
     output "info" "Self-updating:"
     [ -n $(git diff --name-only origin/master | grep manager) ] && {
-        git reset --hard origin/master
+        git reset --hard HEAD
         git pull https://github.com/RXCommunity/manager master
     } || {
         output "info" "Already latest version!"
