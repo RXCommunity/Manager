@@ -191,8 +191,8 @@ function update () {
 function selfupdate {
     cd ~/bin || exit
     output "info" "Self-updating:"
-    git pull https://github.com/RXCommunity/Manager master || \
-    output "err" "Could not pull latest version, did you clone the repository?"
+    git reset --hard origin/master
+    git pull https://github.com/RXCommunity/Manager master 
 }
 
 ## Definitions
