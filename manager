@@ -191,7 +191,7 @@ function update () {
 function selfupdate {
     cd ~/bin || exit
     output "info" "Self-updating:"
-    git reset --hard origin/master
+    git clean || git reset --hard origin/master
     git pull https://github.com/RXCommunity/Manager master
     chmod +x manager
 }
