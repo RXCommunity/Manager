@@ -3,16 +3,21 @@
 ## Functions
 
 function maitenance {
-    output "info" "Removing stopped containers..."
+    output "info" "Removing stopped containers"
     dp "container"
-    output "info" "Pruning unused images..."
+    output "info" "Pruning unused images"
     dp "image"
-    output "info" "Pruning unused volumes..."
+    output "info" "Pruning unused volumes"
     dp "volume"
-    output "info" "Clearing logs..."
+    output "info" "Clearing & Updating APT"
+    apt-get update
+    apt-get clean
+    apt-get autoclean
+    apt-get autoremove
+    output "info" "Clearing logs"
     rm -v /var/log/nginx/*.*
+    journalctl --vacuum-size=20M
     nginx -s reload
-    output "info" "Restarting Telegraf to update log files..."
     systemctl restart telegraf
 }
 
