@@ -2,7 +2,7 @@
 
 ## Functions
 
-function maitenance {
+function maintenance {
     output "info" "Removing stopped containers"
     dp "container"
     output "info" "Pruning unused images"
@@ -237,7 +237,7 @@ functions=(
     "restart"
     "status"
     "update"
-    "maitenance"
+    "maintenance"
     "selfupdate"
 )
 components=(
@@ -276,7 +276,7 @@ case "$1" in
     "restart") stop; start;;
     "status") status;;
     "update") update "$2";;
-    "maitenance") maitenance;;
+    "maintenance") maintenance;;
     "selfupdate") selfupdate;;
     *)
         output "err" "That command does not exist! Available functions are:"
