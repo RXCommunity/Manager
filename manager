@@ -1,168 +1,129 @@
 #!/bin/bash
-
-DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
-
-## Functions
-
-function getlatest () {
-    if [ -x "$(command -v curl)" ]; then
-        curl -s https://api.github.com/repos/"${1}"/releases/latest | grep -oP '"tag_name": "\K(.*)(?=")'
-    else
-        echo "err" "Could not get latest version of ${1}! curl is not installed!"
-    fi
-}
-
-## Output types
-
-function output () {
-    case "$1" in
-        "info") echo -e "${INFO}$2${NC}";;
-        "done") echo -e "${DONE}$2${NC}";;
-        "warn") echo -e "${WARN}$2${NC}";;
-        "err") echo -e "${ERROR}$2${NC}";;
-    esac
-}
-
-## Pre-/Post- execute
-
-function exec-com () {
-    output "info" "Services:"
-    svc-handler "$1"
-    if [ -x "$(command -v docker)" ]; then
-        output "info" "Containers:"
-        dc-handler "$1"
-    fi
-}
-
-## Handlers
-
-## Service handler
-function svc-handler () {
-    servicelist=$(systemctl list-units --type=service --state=active | grep -oe ".*\.service")
-    mapfile -t services < "${DIR}"/services.list
-    for i in "${services[@]}"; do
-        case "$1" in
-            "start")
-                if (( $(echo "${servicelist}" | grep -c "$i") > 0 )); then
-                    output "warn" "Service $i was already running!"
-                else
-                    if (systemctl start "$i" > /dev/null 2>&1); then
-                        output "done" "Started service $i succesfully!"
-                    else
-                        output "err" "Failed to start service $i!"
-                    fi
-                fi
-            ;;
-            "stop")
-                if (( $(echo "${servicelist}" | grep -c "$i") > 0 )); then
-                    if (systemctl stop "$i" > /dev/null 2>&1); then
-                        output "done" "Stopped service $i succesfully!"
-                    else
-                        output "err" "Failed to stop service $i!"
-                    fi
-                else
-                    output "warn" "Service $i is already stopped!"
-                fi
-            ;;
-            "status")
-                if (( $(echo "${servicelist}" | grep -c "$i") > 0 )); then
-                    output "warn" "Service $i is up and running!"
-                else
-                    output "err" "Service $i is stopped!"
-                fi
-            ;;
-        esac
-    done
-}
-
-## Docker handler
-function dc-handler () {
-    dockercont=$(docker ps)
-    dockerstatus=$(systemctl status | grep -c docker)
-    mapfile -t containers < "${DIR}"/containers.list
-    for i in "${containers[@]}"; do
-        if (( "${dockerstatus}" > 0 )); then
-            case "$1" in
-                "start")
-                    if (( $(echo "${dockercont}" | grep -c "$i") > 0 )); then
-                        output "warn" "Container $i was already up and running!"
-                    else
-                        if (docker start "$i" > /dev/null 2>&1); then
-                            output "done" "Started container $i succesfully!"
-                        else
-                            output "err" "Failed to start container $i!"
-                        fi
-                    fi
-                ;;
-                "stop")
-                    if (( $(echo "${dockercont}" | grep -c "$i") > 0 )); then
-                        if (docker stop --time=20 "$i" > /dev/null 2>&1); then
-                            output "done" "Stopped container $i succesfully!"
-                        else
-                            output "err" "Failed to stop container $i!"
-                        fi
-                    else
-                        output "warn" "Container $i was already stopped!"
-                    fi
-                ;;
-                "status")
-                    if (( $(echo "${dockercont}" | grep -c "$i") > 0 )); then
-                        output "warn" "Container $i is up and running!"
-                    else
-                        output "err" "Container $i is stopped!"
-                    fi
-                ;;
-            esac
-            elif (systemctl -q is-active docker); then
-            output "err" "An error has occured, we are sorry!"
-        else
-            output "err" "Docker is stopped, cannot perform check!"
-        fi
-    done
-}
-
-## Streamlined functions
-
-function selfupdate {
-    if [ -x "$(command -v git)" ]; then
-        cd ~/bin || exit
-        output "info" "Self-updating:"
-        if (git diff --name-only origin/master | grep -q manager); then
-            git reset --hard HEAD
-            git pull https://github.com/RXCommunity/manager master
-        else
-            output "info" "Already latest version!"
-        fi
-    else
-        output "err" "You do not have GIT installed!"
-    fi
-}
+# shellcheck disable=SC1090
 
 ## Definitions
 
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+PLIST=${DIR}/plugins/plugin.list
+ELIST=${DIR}/extensions/extension.list
+DEV=true
+
 ## Colors
-NC='\033[0m'
-ERROR='\033[31m'
-WARN='\033[33m'
-DONE='\033[32m'
-INFO='\033[34m'
+
+declare -A COLOR
+COLOR=(
+  [nc]='\033[0m'
+  [erro]='\033[31m'
+  [warn]='\033[33m'
+  [done]='\033[32m'
+  [info]='\033[34m'
+)
+
+## Output types
+
+if ${DEV}; then
+  function output () {
+    declare input="${*:2}";
+    echo -e "${COLOR[$1]}$(date +%F\ %T\ %z) | ${1} | ${input}${COLOR[nc]}"
+  }
+  function xt () {
+    output "$1" "Set return code to $2"
+    return "$2"
+  }
+else
+  function output () {
+    declare input=${*:2};
+    echo -e "${COLOR[$1]}${input}${COLOR[nc]}"
+  }
+  function xt () {
+    return "$2"
+  }
+fi
+
+# Main run
+
+function main () {
+  export CWDIR=${DIR}/plugins/${1}
+  if (containsElement "$1" "${plugins[@]}"); then
+    if [ "$2" = "help" ]; then
+      output "info" "$1"
+    else
+      source "${DIR}/plugins/${1}/main.sh"
+    fi
+  else
+    output "erro" "Plugin $1 not found."
+    avail-plugins
+    output "info" "Tip: If you added the plugin recently, add it to the index with '${0##*/} index'"
+  fi
+}
+
+function containsElement () {
+  local e match="$1"
+  shift
+  for e; do [[ "$e" == "$match" ]] && return 0; done
+  return 1
+}
+
+function nopluginlist {
+  output "warn" "No plugin list found. Try running '${0##*/} index' to index everything."
+}
+
+function avail-plugins {
+  if [ -f "${PLIST}" ]; then
+    output "warn" "Available plugins:"
+    mapfile -t plugins < "${PLIST}" || output "erro" "Failed to load plugin list."
+    output "warn" "${plugins[@]}"
+  else
+    nopluginlist
+  fi
+}
+
+function index {
+  output "info" "Indexing plugins"
+  truncate -s 0 "${PLIST}"
+  for i in $(find "${DIR}"/plugins/* -type d | grep -P "(?<=\/plugins\/)([\w\d\-\_])*" -o); do
+    echo "$i" >> "${PLIST}" && output "done" "Added plugin '$i'."
+  done
+  output "info" "Indexing extensions"
+  truncate -s 0 "${ELIST}"
+  for i in $(find "${DIR}"/extensions/* -type f | grep -P "(?<=\/extensions\/)([\w\d\-\_])*(\.func)" -o); do
+    echo "$i" >> "${ELIST}" && output "done" "Added extension '$i'."
+  done
+}
+
+function loadlists {
+  mapfile -t plugins < "${PLIST}" || output "erro" "Failed to load plugin list."
+  mapfile -t extensions < "${ELIST}" || output "erro" "Failed to load extension list."
+  for i in "${extensions[@]}"; do
+    source "${DIR}/extensions/$i" || output "warn" "Failed to import extension ${i}."
+  done
+}
+
+function preparedirs {
+  if mkdir "${DIR}"/plugins/ "${DIR}"/extensions/; then
+    output "info" "Created a empty plugins and extensions directory."
+  else
+    output "err" "Could not create directory."
+  fi
+}
 
 ## Main run
 
-case "$1" in
-    "command") 
-        exec-com "${2}"
-    ;;
-    "script") 
-        # shellcheck source=/dev/null
-        source "${DIR}/custom/$2.sh"
-    ;;
-    "maintenance") 
-        # shellcheck source=./maintenance.sh
-        source "${DIR}/maintenance.sh"
-    ;;
-    "selfupdate") selfupdate;;
-    *)
-        output "err" "That command does not exist!"
-    ;;
-esac
+[ ${DEV} = "true" ] && output "warn" "Running in development mode!"
+
+if ! [ $# -eq 0 ] && ! [[ "$1" = "index" ]] && [ -f "${PLIST}" ] && [ -f "${ELIST}" ]; then
+  loadlists
+  main "$@"
+elif [ -d "${DIR}"/plugins/ ] && [ -d "${DIR}"/extensions/ ]; then
+  if [ $# -eq 0 ]; then
+    output "warn" "Nothing to do!"
+    avail-plugins
+  elif [[ "$1" = "index" ]]; then
+    index
+  else
+    nopluginlist
+  fi
+else
+  preparedirs
+fi
+! [[ "$1" = "rawpl" ]] && output "done" "Made with ♥ by casKd | t.me/casKd_dev"

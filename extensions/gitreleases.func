@@ -1,0 +1,7 @@
+function getlatest () {
+    if [ -x "$(command -v curl)" ]; then
+        curl -s https://api.github.com/repos/"${1}"/releases/latest | grep -oP '"tag_name": "\K(.*)(?=")'
+    else
+        echo "erro" "Could not get latest version of ${1}! curl is not installed!"
+    fi
+}
