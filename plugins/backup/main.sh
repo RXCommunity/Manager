@@ -6,7 +6,7 @@ mysqldump -h "${MSQL_HOST}" -P"${MSQL_PORT}" -u"${MSQL_USER}" -p"${MSQL_PASS}" -
 
 # Postgres (Docker)
 output info "Backing up PostgreSQL"
-docker exec main-db_postgres_1 pg_dumpall -U "${PSQL_USER}" | gzip -c > "${PSQL_PATH}"postgres-$(date +%s).sql.gz || output erro "Failed to backup PostgreSQL"
+docker exec main-db_postgres_1 pg_dumpall -U "${PSQL_USER}" | gzip -c > "${PSQL_PATH}"/postgres-$(date +%s).sql.gz || output erro "Failed to backup PostgreSQL"
 
 # InfluxDB (Docker)
 # output info "Backing up InfluxDB"
