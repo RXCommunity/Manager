@@ -23,17 +23,23 @@ COLOR=(
 
 if ${DEV}; then
   function output () {
-    declare input="${*:2}";
-    echo -e "${COLOR[$1]}$(date +%F\ %T\ %z) | ${1} | ${input}${COLOR[nc]}"
+    while read LINE; do
+      if [[ ${LINE%% *} =~ ^erro|done|info|warn$ ]]; then
+        echo -e "${COLOR[${LINE%% *}]}$(date +%F\ %T\ %z) | ${LINE%% *} | ${LINE#* }${COLOR[nc]}"
+      else
+        echo -e "${COLOR[nc]}$(date +%F\ %T\ %z) | ${LINE}${COLOR[nc]}"
+      fi
+    done
   }
   function xt () {
-    output "$1" "Set return code to $2"
+    echo "$1 Set return code to $2"
     return "$2"
   }
 else
   function output () {
-    declare input=${*:2};
-    echo -e "${COLOR[$1]}${input}${COLOR[nc]}"
+    while read LINE; do
+      echo -e "${COLOR[${LINE%% *}]}${LINE#* }${COLOR[nc]}"
+    done
   }
   function xt () {
     return "$2"
@@ -46,14 +52,15 @@ function main () {
   export CWDIR=${DIR}/plugins/${1}
   if (containsElement "$1" "${plugins[@]}"); then
     if [ "$2" = "help" ]; then
-      output "info" "$1"
+      echo "info $1"
     else
-      source "${DIR}/plugins/${1}/main.sh"
+      [ -f "${CWDIR}/.env" ] && source "${CWDIR}/.env"
+      source "${CWDIR}/main.sh"
     fi
   else
-    output "erro" "Plugin $1 not found."
+    echo "erro Plugin $1 not found."
     avail-plugins
-    output "info" "Tip: If you added the plugin recently, add it to the index with '${0##*/} index'"
+    echo "info Tip: If you added the plugin recently, add it to the index with '${0##*/} index'"
   fi
 }
 
@@ -65,58 +72,58 @@ function containsElement () {
 }
 
 function nopluginlist {
-  output "warn" "No plugin list found. Try running '${0##*/} index' to index everything."
+  echo "warn No plugin list found. Try running '${0##*/} index' to index everything."
 }
 
 function avail-plugins {
   if [ -f "${PLIST}" ]; then
-    output "warn" "Available plugins:"
-    mapfile -t plugins < "${PLIST}" || output "erro" "Failed to load plugin list."
-    output "warn" "${plugins[@]}"
+    echo "warn Available plugins:"
+    mapfile -t plugins < "${PLIST}" || echo "erro Failed to load plugin list."
+    echo "warn ${plugins[@]}" 
   else
     nopluginlist
   fi
 }
 
 function index {
-  output "info" "Indexing plugins"
+  echo "info Indexing plugins"
   truncate -s 0 "${PLIST}"
   for i in $(find "${DIR}"/plugins/* -type d | grep -P "(?<=\/plugins\/)([\w\d\-\_])*" -o); do
-    echo "$i" >> "${PLIST}" && output "done" "Added plugin '$i'."
+    echo "$i" >> "${PLIST}" && echo "done Added plugin '$i'."
   done
-  output "info" "Indexing extensions"
+  echo "info Indexing extensions"
   truncate -s 0 "${ELIST}"
   for i in $(find "${DIR}"/extensions/* -type f | grep -P "(?<=\/extensions\/)([\w\d\-\_])*(\.func)" -o); do
-    echo "$i" >> "${ELIST}" && output "done" "Added extension '$i'."
+    echo "$i" >> "${ELIST}" && echo "done Added extension '$i'."
   done
 }
 
 function loadlists {
-  mapfile -t plugins < "${PLIST}" || output "erro" "Failed to load plugin list."
-  mapfile -t extensions < "${ELIST}" || output "erro" "Failed to load extension list."
+  mapfile -t plugins < "${PLIST}" || echo "erro Failed to load plugin list."
+  mapfile -t extensions < "${ELIST}" || echo "erro Failed to load extension list."
   for i in "${extensions[@]}"; do
-    source "${DIR}/extensions/$i" || output "warn" "Failed to import extension ${i}."
+    source "${DIR}/extensions/$i" || echo "warn Failed to import extension ${i}."
   done
 }
 
 function preparedirs {
   if mkdir "${DIR}"/plugins/ "${DIR}"/extensions/; then
-    output "info" "Created a empty plugins and extensions directory."
+    echo "info Created a empty plugins and extensions directory."
   else
-    output "err" "Could not create directory."
+    echo "erro Could not create directory."
   fi
 }
 
 ## Main run
 
-[ ${DEV} = "true" ] && output "warn" "Running in development mode!"
-
+(
+[ ${DEV} = "true" ] && echo "warn Running in development mode!"
 if ! [ $# -eq 0 ] && ! [[ "$1" = "index" ]] && [ -f "${PLIST}" ] && [ -f "${ELIST}" ]; then
   loadlists
   main "$@"
 elif [ -d "${DIR}"/plugins/ ] && [ -d "${DIR}"/extensions/ ]; then
   if [ $# -eq 0 ]; then
-    output "warn" "Nothing to do!"
+    echo "warn Nothing to do!"
     avail-plugins
   elif [[ "$1" = "index" ]]; then
     index
@@ -126,4 +133,5 @@ elif [ -d "${DIR}"/plugins/ ] && [ -d "${DIR}"/extensions/ ]; then
 else
   preparedirs
 fi
-! [[ "$1" = "rawpl" ]] && output "done" "Made with ♥ by casKd | t.me/casKd_dev"
+! [[ "$1" = "rawpl" ]] && echo "info Made with ♥ by casKd | t.me/casKd_dev"
+) | output

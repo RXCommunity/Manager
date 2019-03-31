@@ -1,8 +1,6 @@
-source "${CWDIR}/.env"
-
 # Record name $3
 # Record type $4
-# Record content $5 (default: own IP)
+# Record content $5 (TODO default: own IP)
 # Cloudflare Proxy $6 (true/false)
 
 if FETCH=$(curl -sX GET "https://api.cloudflare.com/client/v4/zones/$ZONE/dns_records" \
@@ -13,7 +11,12 @@ if FETCH=$(curl -sX GET "https://api.cloudflare.com/client/v4/zones/$ZONE/dns_re
   case "$2" in
     "list")
       for ((i=0;i<${#DOMAIN[@]};++i)); do
-        echo "$(echo "${FETCH}" | jq -r ".result[${i}].name") $(echo "${FETCH}" | jq -r ".result[${i}].type") $(echo "${FETCH}" | jq -r ".result[${i}].content") $(echo "${FETCH}" | jq -r ".result[${i}].id")" | output info $(</dev/stdin)
+        echo "info ----------------------------------------------------------"
+        echo "info Record name: $(echo "${FETCH}" | jq -r ".result[${i}].name")"
+        echo "info Record type: $(echo "${FETCH}" | jq -r ".result[${i}].type")"
+        echo "info Record cont: $(echo "${FETCH}" | jq -r ".result[${i}].content")"
+        echo "info Record iden: $(echo "${FETCH}" | jq -r ".result[${i}].id")"
+        echo "info ----------------------------------------------------------"
       done
     ;;
     "set")
@@ -23,9 +26,9 @@ if FETCH=$(curl -sX GET "https://api.cloudflare.com/client/v4/zones/$ZONE/dns_re
           -H "X-Auth-Key: ${AUTH_KEY}" \
           -H "Content-Type: application/json" \
           --data "{\"type\":\"${4}\",\"name\":\"${3}\",\"content\":\"${5}\",\"proxied\":"${6}"}" | jq -r '.success'); then
-          output done "Registered entry successfully."
+          echo "done Registered entry successfully."
         else
-          output erro "Failed to add entry"
+          echo "erro Failed to add entry"
         fi
       else
         for ((i=0;i<${#DOMAIN[@]};++i)); do
@@ -35,9 +38,9 @@ if FETCH=$(curl -sX GET "https://api.cloudflare.com/client/v4/zones/$ZONE/dns_re
             -H "X-Auth-Key: ${AUTH_KEY}" \
             -H "Content-Type: application/json" \
             --data "{\"type\":\"${4}\",\"name\":\"${3}\",\"content\":\"${5}\",\"proxied\":"${6}"}" | jq -r '.success'); then
-              output done "Edited entry successfully."
+              echo "done Edited entry successfully."
             else
-              output erro "Failed to edit entry"
+              echo "erro Failed to edit entry"
             fi
           fi
         done
@@ -51,14 +54,14 @@ if FETCH=$(curl -sX GET "https://api.cloudflare.com/client/v4/zones/$ZONE/dns_re
             -H "X-Auth-Email: ${EMAIL}" \
             -H "X-Auth-Key: ${AUTH_KEY}" \
             -H "Content-Type: application/json" | jq -r '.success'); then
-              output done "Removed entry successfully."
+              echo "done Removed entry successfully."
             else
-              output erro "Failed to remove entry"
+              echo "erro Failed to remove entry"
             fi
           fi
         done
       else
-        output warn "Entry ${3} does not exist."
+        echo "warn Entry ${3} does not exist."
       fi
     ;;
   esac
